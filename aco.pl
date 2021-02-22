@@ -87,18 +87,17 @@ path([X|Unvisited], Path, SumCost0) :-
 	!.
 /*****************************************************************************/
 
-run(SolPath, SolCost) :-
-    initProb,
+runACO(SolPath, SolCost) :-
+    findall(X:Y, arc(X,Y,_), XYs), initTP(XYs),
     assert(bestSol([],2^31-1)),
-    runCycle,
+    bestSol(_, OldCost), runCycle,
+    writeln("   reRun?"), reRun(OldCost),    
     bestSol(SolPath, SolCost), !.
 
 runCycle() :-
-    bestSol(_, OldCost),
     findall(X:Y, arc(X,Y,_), XYs), evaporateT(XYs),
     totalAnts(M), runAllAnts(M),
-    updateAux(XYs),
-    writeln("   reRun?"), reRun(OldCost).
+    mapUpdateP(XYs).
 
 reRun(OldCost) :-
     bestSol(_, NewCost),
@@ -137,6 +136,10 @@ evaporateT([X:Y|XYs]) :-
 assertT(X,Y, TauNew) :-			
     retractall(int(X,Y,_)),retractall(int(Y,X,_)),
     assert(int(X,Y, TauNew)).
+
+mapUpdateP([]).
+mapUpdateP([X:Y|XYs]) :- updateP(X,Y), mapUpdateP(XYs).
+
 %Probabilities sind nicht normiert
 updateP(X,Y) :-
     alpha(A), beta(B), 
@@ -150,17 +153,16 @@ updateC(Path, C) :-
     write("   UPDATECOST: "), write(Cbest), write(" ---> "), writeln(C), writeln(""), 
     retractall(bestSol(_,_)), assert(bestSol(Path, C)).
 
+
 %%% Funktionen zum Testen der Initialisierung
-initProb :- findall(X:Y, arc(X,Y,_), XYs), initAux(XYs).
+initTP([]).
+initTP([X:Y|XYs]) :- assert(int(X,Y, 1)), updateP(X,Y), initTP(XYs).
 
-initAux([]).
-initAux([X:Y|XYs]) :- assert(int(X,Y, 1)), updateP(X,Y), initAux(XYs).
 
-updateAux([]).
-updateAux([X:Y|XYs]) :- updateP(X,Y), updateAux(XYs).
-
+/*****************************************************************************/
+%%% Hilfsfunktionen zur Ausgabe
 round(X,Y,D) :- Z is X * 10^D, round(Z, ZA), Y is ZA / 10^D.
-							      
+
 % Pretty Print von Listen
 pp([H|T],I) :- !, J is I+3, pp(H,J), ppx(T,J),nl.
 pp(X,I):- tab(I), write(X), nl.
