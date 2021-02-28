@@ -50,7 +50,7 @@ reRun(OldCost) :-
     NewCost < OldCost, runACO.
 reRun(_). % todo raus?
 
-runCycleMultiple(0) :- writeln("All Ants are finished. Cycle Ended").
+runCycleMultiple(0).
 runCycleMultiple(Count) :-
     Count1 is Count -1, runCycle, runCycleMultiple(Count1).
 
@@ -62,7 +62,7 @@ runCycle :-
     totalAnts(M), runAllAnts(M),
     mapUpdateP(XYs).
 
-runAllAnts(0).
+runAllAnts(0). % :- writeln("All Ants are finished. Cycle Ended").
 runAllAnts(Count) :- 
     runAnt, Count1 is Count -1,
     runAllAnts(Count1).
@@ -204,10 +204,9 @@ dotNode([N|Nodes]) :-
     dotNode(Nodes).
 
 dotEdge([]).
-/*
 dotEdge([X:Y|XYs]) :-
     edgeT(X, Y, T), T < 3, !,
-    dotEdge(XYs). */
+    dotEdge(XYs).
 dotEdge([X:Y|XYs]) :-
     edgeC(X, Y, C), edgeT(X, Y, T), edgeP(X, Y, P),
     round(T, TR, 3), round(P, PR, 3), CR is round(C),
@@ -218,12 +217,8 @@ dotEdge([X:Y|XYs]) :-
     writeln("\"]"),
     dotEdge(XYs).
 
-
-
-
-
 /* Die Kosten werden entnormiert und der Lösungspfad wird ausgegeben, um als
-Gnuplot anzeigen zu werden.*/
+Gnuplot anzeigen zu werden. */
 printSol(CostOut) :-
     ['townNorm.pl'], normXY(NormXY),
     bestSol(Path, CostNormed),
@@ -231,11 +226,38 @@ printSol(CostOut) :-
     round(Cost1, CostOut, 2),
     last(Path, Last), % Der Startknoten kommt zweimal im .dat vor
     tell('tsp_solution.dat'),
-    auxSol([Last|Path]),
-    told, !.
+    auxSol([Last|Path]),    
+    told,
+    printTau, !.
 
 auxSol([]).
 auxSol([N|NS]) :-
     townN(N, XCord, YCord),
     write(N), write(" "), write(XCord), write(" "), writeln(YCord),
     auxSol(NS).
+
+/* Ausgeben der Pheromone für Gnuplot.*/
+printTau :-
+    tell('tsp_tau.dat'),    
+    findall(Tau, int(_, _, Tau), TauS),
+    max_member(MaxTau, TauS),
+    round(MaxTau, MaxOut, 3),
+    write("Maximum T value: "), writeln(MaxOut),
+    findall(X:Y:T, int(X,Y,T), XYTs),
+    printArc(XYTs, MaxTau), told.
+
+printArc([], _).
+printArc([X:Y:T|XYTs], MaxTau) :-    
+    TauNorm is round(100*T/MaxTau),
+    printTown(X), printTown(Y),
+    write("   "), writeln(TauNorm),
+    printArc(XYTs, MaxTau).
+
+printTown(N) :-    
+    townN(N, XCord, YCord),
+    round(XCord, XCordR, 3),
+    round(YCord, YCordR, 3),    
+    write(XCordR), write(" "),
+    write(YCordR), write(" ").
+	
+	
