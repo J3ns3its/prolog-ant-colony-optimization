@@ -15,8 +15,8 @@ alpha(1).
 beta(5).
 persistance(0.5). % Verdampfen der Trails
 constantQ(100). % Faktor für Tau
-totalAnts(100). 
-
+totalAnts(100). % M Ants per Cycle.
+stableSolCountForLoopStop(5).
 /******************************************************************************
 Teil 1: Boilerplate*/
 
@@ -26,17 +26,22 @@ startWInit(SolPath, SolCost) :-
     assert(bestSol([], 2^31-1)),
     start(SolPath, SolCost), !.
 
-/* Start mit anschließenden printen der Lösung. Kann wiederholt aufgerufen 
+/* Start mit anschließenden Ausgeben der Lösung. Kann wiederholt aufgerufen 
 werden, um die ausgegebene Lösung zu verbessern. */
-start(SolPath, SolCost) :-
+start(SolPath, SolCostOut) :-
     runACO,
-    printSol(SolCost),
-    bestSol(SolPath, _),!.
+    bestSol(SolPath, CostNormed),
+    ['townNorm.pl'],    
+    normXY(NormXY),
+    Cost1 is (NormXY * CostNormed/100),
+    round(Cost1, SolCostOut, 2),    
+    writeSol, !. 
 
 /**/
 runACO :-
     bestSol(_, OldCost),
-    runCycleMultiple(5),
+    stableSolCountForLoopStop(Count),
+    runCycleMultiple(Count),
     reRun(OldCost).
 
 /* Überprüft, ob die Aktuelle lösung eine Verbesserung ist und startet einen
@@ -60,11 +65,11 @@ kompletten Pfad zurück. Anschließend werden die preferenzes neu berechnet, um 
 runCycle :-
     findall(X:Y, arc(X, Y, _), XYs), evaporateT(XYs),
     totalAnts(M), runAllAnts(M),
-    mapUpdateP(XYs).
+    updateP(XYs).
 
 runAllAnts(0). % :- writeln("All Ants are finished. Cycle Ended").
 runAllAnts(Count) :- 
-    runAnt, Count1 is Count -1,
+    runAnt, Count1 is Count - 1,
     runAllAnts(Count1).
 
 /* Für eine Ameise mit zufälligen Startpunkt wir ein Pfad ermittelt.
@@ -73,8 +78,8 @@ und sie werden nur hier aktualisiert */
 runAnt :-
     nodes(Nodes),
     random_select(Start, Nodes, Rest),    
-    path([Start|Rest], Path, C), updateC(Path, C),
-    last(Path, Last), updateT(Start, Last, C), mapUpdateT(Path, C).
+    path([Start|Rest], Path, C), updateBestSol(Path, C),
+    last(Path, Last), updateT(Start, Last, C), updateT(Path, C).
 %    write("   Path: "), write(Path), write("   Cost: "), writeln(C).    
 
 
@@ -94,7 +99,7 @@ path([X|Unvisited], Path, SumCost0) :-
 	SumCost0 is SumCost1 + C,
 	!.
 
-% Hilfsfunktion: path/4 wuerfelt einen Pfad aus und berechnet die Kosten:
+% Hilfsfunktion: path/4 wuerfelt einen geschlossenen Pfad aus und berechnet die Kosten:
 path(X, [Y], [X,Y], C) :- edgeC(X, Y, C).
 path(X, Unvisited0, [X|Path], SumCost0) :-
         choice(X, Unvisited0, Y),
@@ -103,13 +108,13 @@ path(X, Unvisited0, [X|Path], SumCost0) :-
 	path(Y, Unvisited1, Path, SumCost1),
 	SumCost0 is SumCost1 + C.
 
-/* Wählt einen Unvisited-Knoten als Ziel.
- NPs: Node: Preferenzliste von unbesuchten Nachbarn */
+/* Wählt einen Unvisited-Knoten als Ziel.*/
 choice(X, Unvisited, Y) :-
+%NPs: Node: Tupelliste von Knotenlabels und Preferenzen von unbesuchten Nachbarn
     setof(N:P, (member(N, Unvisited), edgeP(X, N, P)), NPs),
     sumP(NPs, 0, Pges),
-    random(0, Pges, Tar),
-    roll(NPs, Tar, 0, Y).
+    random(0, Pges, PTarget),
+    seekNode(NPs, PTarget, 0, Y).
 /*    write("   Unvisited: "), writeln(Unvisited0),    
     writeln("   NPs: "), pp(NPs,0),
     write("   SumP: "), writeln(Pges),
@@ -118,29 +123,31 @@ choice(X, Unvisited, Y) :-
 
 % Summe der Preferences:
 sumP([], Pges, Pges).
-sumP([_:P|NPs], AkkIn, Pges) :-
-    AkkOut is AkkIn + P, sumP(NPs, AkkOut, Pges).
+sumP([_:P|NPs], AccIn, Pges) :-
+    AccOut is AccIn + P, sumP(NPs, AccOut, Pges).
 
-% Auswuerfeln des als nächstes zu besuchenden Knoten N
-roll([],_,_,_) :- false.
-roll([N:P|_], Tar, Akk, N) :- Tar < Akk + P, !.
-roll([_:P|NPs], Tar, AkkIn, Y) :-
-    AkkOut is AkkIn + P, roll(NPs, Tar, AkkOut, Y).
+%  des als nächstes zu besuchenden Knoten N
+seekNode([],_,_,_) :- false. % Should never occur
+seekNode([N:P|_], PTarget, Acc, N) :- PTarget < Acc + P, !.
+seekNode([_:P|NPs], PTarget, AccIn, Y) :-
+    Acc1 is AccIn + P, seekNode(NPs, PTarget, Acc1, Y).
 
 /******************************************************************************
 Teil 3 Initialisieren und Updaten von Tau, Preference und Cost. */
 
-/* Initialisieren der Pheromonone und Preferences von allen Edges.*/
+/* Initialisieren der Pheromonone  und Preferences von allen Edges.
+Die Pheromone werden alle mit der selben Konstante initialisiert, der erste
+Cycle entspricht dem Greedy Algorithmus.*/
 initTP([]).
 initTP([X:Y|XYs]) :- assert(int(X, Y, 1)), updateP(X, Y), initTP(XYs).
 
-/* Tau von allen Edges, die Teil des Pfades einer Ameise waren, werden 
+/* updateT/1 Tau von allen Edges, die Teil des Pfades einer Ameise waren, werden
 aktualisiert.*/
-mapUpdateT([_], _).
-mapUpdateT([X, Y|Path], C) :- updateT(X, Y, C), mapUpdateT([Y|Path], C).
+updateT([_], _).
+updateT([X, Y|Path], C) :- updateT(X, Y, C), updateT([Y|Path], C).
 
-/* Aktualisiert eine einzige Edge, welche Teil des Pfades einer einzelnen Ameise
- war.*/
+/* updateT/3 Aktualisiert eine einzige Edge, welche Teil des Pfades einer 
+einzelnen Ameise war.*/
 updateT(X, Y, C) :-
     edgeT(X, Y, TauOld), constantQ(Q),
     TauNew is TauOld + Q/C,
@@ -157,11 +164,12 @@ assertT(X, Y, TauNew) :-
     retractall(int(X, Y, _)), retractall(int(Y, X, _)),
     assert(int(X, Y, TauNew)).
 
-mapUpdateP([]).
-mapUpdateP([X:Y|XYs]) :- updateP(X, Y), mapUpdateP(XYs).
-
-/* Aktualisieren der Preference einer edge mittels der zuvor berechneteten Trail
+/* updateP/1 Aktualisieren der Preference einer edge mittels der zuvor berechneteten Trail
  intensity Tau. Die Preferences sind nicht normiert. */
+updateP([]).
+updateP([X:Y|XYs]) :- updateP(X, Y), updateP(XYs).
+
+/* updateP/2 */
 updateP(X, Y) :-
     alpha(A), beta(B), 
     edgeT(X, Y, Tau), edgeC(X, Y, C),
@@ -169,8 +177,8 @@ updateP(X, Y) :-
     retractall(pref(X, Y, _)), assert(pref(X, Y, P)).    
 
 /* Ist die neu gefundene Lösung eine Verbesserung, so wird sie gespeichert.*/
-updateC(_, C) :- bestSol(_, Cbest), C >= Cbest.
-updateC(Path, C) :-
+updateBestSol(_, C) :- bestSol(_, Cbest), C >= Cbest.
+updateBestSol(Path, C) :-
     bestSol(_, Cbest), C < Cbest,
     write("   UPDATE Best Cost: "), write(Cbest),
     write(" ---> "), writeln(C), writeln(""), 
@@ -189,7 +197,7 @@ ppx([H|T], I):-pp(H, I),ppx(T, I).
 
 /* Erstellt ein Dotfile des Graphen mit den aktuellen Kosten, Preferences und 
 Tau.*/
-dotGraph :-
+writeDotGraph :-
     tell('ausgabeTsp.dot'),
     writeln("digraph G {\nnode [ordering=\"out\"]"),
     writeln("node [shape=circle, height=0.25, fixedsize=\"true\"]"),    
@@ -219,16 +227,13 @@ dotEdge([X:Y|XYs]) :-
 
 /* Die Kosten werden entnormiert und der Lösungspfad wird ausgegeben, um als
 Gnuplot anzeigen zu werden. */
-printSol(CostOut) :-
-    ['townNorm.pl'], normXY(NormXY),
-    bestSol(Path, CostNormed),
-    Cost1 is (NormXY * CostNormed/100),
-    round(Cost1, CostOut, 2),
+writeSol :-
+    bestSol(Path, _),
     last(Path, Last), % Der Startknoten kommt zweimal im .dat vor
     tell('tsp_solution.dat'),
     auxSol([Last|Path]),    
     told,
-    printTau, !.
+    writeTau, !.
 
 auxSol([]).
 auxSol([N|NS]) :-
@@ -237,23 +242,23 @@ auxSol([N|NS]) :-
     auxSol(NS).
 
 /* Ausgeben der Pheromone für Gnuplot.*/
-printTau :-
+writeTau :-
     tell('tsp_tau.dat'),    
     findall(Tau, int(_, _, Tau), TauS),
     max_member(MaxTau, TauS),
     round(MaxTau, MaxOut, 3),
     write("Maximum T value: "), writeln(MaxOut),
     findall(X:Y:T, int(X,Y,T), XYTs),
-    printArc(XYTs, MaxTau), told.
+    writeArc(XYTs, MaxTau), told.
 
-printArc([], _).
-printArc([X:Y:T|XYTs], MaxTau) :-    
+writeArc([], _).
+writeArc([X:Y:T|XYTs], MaxTau) :-    
     TauNorm is round(100*T/MaxTau),
-    printTown(X), printTown(Y),
+    writeTown(X), writeTown(Y),
     write("   "), writeln(TauNorm),
-    printArc(XYTs, MaxTau).
+    writeArc(XYTs, MaxTau).
 
-printTown(N) :-    
+writeTown(N) :-    
     townN(N, XCord, YCord),
     round(XCord, XCordR, 3),
     round(YCord, YCordR, 3),    
