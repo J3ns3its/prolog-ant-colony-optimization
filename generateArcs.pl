@@ -8,23 +8,30 @@ normTowns :-
     min_member(LowY, Ys),
     max_member(MaxY, Ys),
     NormY is MaxY - LowY,
-    
+
+    max_member(NormXY, [NormX,NormY]),
     write("   LowX: "), writeln(LowX),
     write("   NormX: "), writeln(NormX),
     write("   LowY: "), writeln(LowY),
     write("   NormY: "), writeln(NormY),    
     tell('townNorm.pl'),
-    findall(ID:X:Y, town(ID,X,Y), Towns), normSingleTown(Towns, NormX, LowX, NormY, LowY),
+    findall(ID:X:Y, town(ID,X,Y), Towns), normSingleTown(Towns, NormXY, LowX, LowY),
+    write("\nnormXY("), write(NormXY), writeln(")."),
     told,
     genArcs, !.
 
-normSingleTown([], _, _, _, _).
-normSingleTown([ID:X:Y|IDXY], NormX, LowX, NormY, LowY) :-
-    XN is 100*((X - LowX) / NormX), YN is 100*((Y - LowY) / NormY),
+getNorm(NormX, NormY, NormX) :-
+    NormX > NormY.
+getNorm(NormX, NormY, NormY) :-
+    NormX =< NormY.
+
+normSingleTown([], _, _, _).
+normSingleTown([ID:X:Y|IDXY], NormXY, LowX, LowY) :-
+    XN is 100*((X - LowX) / NormXY), YN is 100*((Y - LowY) / NormXY),
 %    write("   normSingleTown: "), writeln(ID), writeln(XN), writeln(YN),    
     write("townN("), write(ID), write(", "), write(XN),
     write(", "), write(YN), writeln(")."),
-    normSingleTown(IDXY, NormX, LowX, NormY, LowY).
+    normSingleTown(IDXY, NormXY, LowX, LowY).
 
 genArcs :-
     ['townNorm.pl'],
