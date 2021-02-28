@@ -18,7 +18,8 @@ normTowns :-
     findall(ID:X:Y, town(ID,X,Y), Towns), normSingleTown(Towns, NormXY, LowX, LowY),
     write("\nnormXY("), write(NormXY), writeln(")."),
     told,
-    genArcs, !.
+    genArcs,
+    writeln("Generated file arcs.pl."), !.
 
 getNorm(NormX, NormY, NormX) :-
     NormX > NormY.
@@ -51,6 +52,6 @@ addSingleArc(_, _, _, []).
 addSingleArc(ID1, X1, Y1, [ID2:X2:Y2|IDXY]) :-
 %    write("   addSingleArc: "), writeln(ID1), writeln(ID2), writeln(IDXY),
     C is sqrt((X1 - X2)^2 + (Y1 - Y2)^2),
-    write("arc("), write(ID1), write(", "), write(ID2),
+    write("arcCost("), write(ID1), write(", "), write(ID2),
     write(", "), write(C), writeln(")."),
     addSingleArc(ID1, X1, Y1, IDXY).
