@@ -1,3 +1,8 @@
+/* Diese Datei stellt das Prädikat nornTowns0 zur verfügung.
+Alle vorliegenden Städte town(Label, XCord, YCord) werden bearbeitet und deren 
+Koordinaten normiert und in die Datei townNorm.pl ausgegeben. Anschließend 
+werden die Kanten mit normierten Längen berechnet und in die Datei arcs.pl 
+ausgegeben.*/
 normTowns :-
     findall(X ,town(_, X, _), Xs),    
     min_member(LowX, Xs),
@@ -18,6 +23,7 @@ normTowns :-
     findall(ID:X:Y, town(ID,X,Y), Towns), normSingleTown(Towns, NormXY, LowX, LowY),
     write("\nnormXY("), write(NormXY), writeln(")."),
     told,
+    writeln("Generated file town.pl."), !,
     genArcs,
     writeln("Generated file arcs.pl."), !.
 

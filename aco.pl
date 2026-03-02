@@ -3,9 +3,9 @@ Benutzung: siehe README.txt*/
 
 :- writeln("\nImported arcs.pl.\n"), ['arcs.pl'].
 /* Die Begriffe wurden verwendet im Sinne des usprünglichen Ant System Paper von
- Dorigo, Maniezzo, Colorni von 1996. */
+ Dorigo, Maniezzo, Colorni von 1996.
 
-/* Es werden die folgenden dynamischen globalen Variablen mittels assert 
+ Es werden die folgenden dynamischen globalen Variablen mittels assert 
 verwendet:
  o arcPref : Preferenz ist die unnormierte Wahrscheinlichkeit einer Kante.
  o arcTau : beschreibt die Intensität einer edge, diese werden nach dem Lauf 
@@ -23,10 +23,10 @@ allArcs(XYs) :- findall(X:Y, arcCost(X, Y, _), XYs).
 Parameter settings*/
 alpha(1). 
 beta(5).
-persistance(0.5). % Verdampfen der Trails
+persistance(0.9). % Verdampfen der Trails
 constantQ(100). % Faktor für Tau
 totalAnts(100). % M Ants per Cycle.
-stableSolCountForLoopStop(5).
+stableSolCountForLoopStop(10).
 /******************************************************************************
 Teil 1: Boilerplate*/
 mainRunUntilStable :-
@@ -269,7 +269,7 @@ writeTau :-
 
 writeArc([], _).
 writeArc([X:Y:T|XYTs], MaxTau) :-    
-    TauNorm is round(100*T/MaxTau),
+    TauNorm is 1 + round(100*T/MaxTau),
     writeTown(X), writeTown(Y),
     write("   "), writeln(TauNorm),
     writeArc(XYTs, MaxTau).
