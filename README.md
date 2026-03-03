@@ -15,7 +15,7 @@ run.
 runCycles(N). 
 
 # Generate solution PDF
-  gnuplot -c tsp_solution.plt
+  gnuplot -c tsp_solution.plt  
   gnuplot -c tsp_tau.plt
 
 # Sources
